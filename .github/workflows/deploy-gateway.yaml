@@ -25,14 +25,13 @@ jobs:
         with:
           deck-version: '1.39.3'
 
-      # Step A: Dry-run comparison (This securely lints, structural-validates, 
-      # and checks Konnect remote schema rules in one clean command)
+      # Step A: Validate structural rules and preview diff changes
       - name: Validate and Check Configuration Diff
         run: |
           deck gateway diff kong-gateway/
 
-      # Step B: Sync execution (Triggers only when code merges into your main production branch)
+      # Step B: Sync execution (Changed 'apply' to 'sync' for this decK version)
       - name: Sync Configuration to Konnect
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          deck gateway apply kong-gateway/
+          deck gateway sync kong-gateway/
