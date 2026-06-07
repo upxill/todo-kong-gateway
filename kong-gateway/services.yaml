@@ -1,0 +1,11 @@
+_format_version: "3.0"
+
+services:
+  - name: todo-service
+    url: https://jsonplaceholder.typicode.com
+    routes:
+      - name: todo-route
+        paths:
+          - /todos
+        # Set to false to ensure nested sub-paths (like /todos/1) pass through smoothly
+        strip_path: false

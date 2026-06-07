@@ -1,0 +1,6 @@
+_format_version: "3.0"
+
+consumers:
+  - username: upxill-dev
+    keyauth_credentials:
+      - key: upxill-secret-key
