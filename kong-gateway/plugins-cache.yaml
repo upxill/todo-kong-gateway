@@ -4,7 +4,7 @@ plugins:
   - name: proxy-cache
     config:
       strategy: memory
-      cache_ttl: 300               # Keeps cache responses alive for 5 minutes
+      cache_ttl: 600               # Keeps cache responses alive for 5 minutes
       content_type:
         - application/json; charset=utf-8
       response_code:
