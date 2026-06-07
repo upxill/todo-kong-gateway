@@ -3,16 +3,15 @@ name: Deploy Kong Gateway to Konnect
 on:
   push:
     branches:
-      - main  # Triggers deployment when changes are merged to main
+      - main
   pull_request:
     branches:
-      - main  # Triggers a dry-run check on PRs to catch validation syntax errors early
+      - main
 
 jobs:
   deck-deploy:
     runs-on: ubuntu-latest
     
-    # Define environment variables used by decK natively
     env:
       DECK_KONNECT_TOKEN: ${{ secrets.DECK_KONNECT_TOKEN }}
       DECK_KONNECT_CONTROL_PLANE_NAME: "quickstart"
@@ -21,23 +20,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Installs the official decK CLI tool onto the runner instance
       - name: Setup decK
         uses: kong/setup-deck@v1
         with:
-          deck-version: '1.39.3' # Pin to your matching local major version
+          deck-version: '1.39.3'
 
-      # Step A: Validate syntax and lint configurations
-      - name: Validate Gateway Configuration
+      # FIX: Added offline structural validation flag to prevent Konnect mode errors
+      - name: Validate Gateway Configuration Structure
         run: |
-          deck gateway validate kong-gateway/
+          deck gateway validate kong-gateway/ --online-validation=false
 
-      # Step B: Dry-run comparison (Runs on both PRs and pushes to verify diff changes)
+      # Step B: Dry-run comparison (This checks remote rules safely)
       - name: Check Configuration Diff
         run: |
           deck gateway diff kong-gateway/
 
-      # Step C: Actual sync execution (Only triggers on a hard push/merge to the main branch)
+      # Step C: Sync execution
       - name: Sync Configuration to Konnect
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
