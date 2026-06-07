@@ -25,17 +25,13 @@ jobs:
         with:
           deck-version: '1.39.3'
 
-      # FIX: Added offline structural validation flag to prevent Konnect mode errors
-      - name: Validate Gateway Configuration Structure
-        run: |
-          deck gateway validate kong-gateway/ --online-validation=false
-
-      # Step B: Dry-run comparison (This checks remote rules safely)
-      - name: Check Configuration Diff
+      # Step A: Dry-run comparison (This securely lints, structural-validates, 
+      # and checks Konnect remote schema rules in one clean command)
+      - name: Validate and Check Configuration Diff
         run: |
           deck gateway diff kong-gateway/
 
-      # Step C: Sync execution
+      # Step B: Sync execution (Triggers only when code merges into your main production branch)
       - name: Sync Configuration to Konnect
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
