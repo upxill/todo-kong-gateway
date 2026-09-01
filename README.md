@@ -1,65 +1,55 @@
-**Todo API - Kong Gateway**
+# Todo API — Kong Gateway on Konnect
 
-A concise overview of the `todo-kong-gateway` configuration, architecture, CI/CD pipeline, and the components present in this folder.
+A declarative Kong Gateway configuration that fronts a sample TODO service (backed by [jsonplaceholder](https://jsonplaceholder.typicode.com)) and deploys it to **Kong Konnect** — Kong's managed cloud control plane — via decK, with a GitHub Actions pipeline that validates, diffs, and applies changes on every push.
 
-**Overview**
-- **Purpose:**: Declarative configuration for a Kong Gateway that fronts a sample TODO service (uses jsonplaceholder).
-- **Deployment target:**: Konnect (Kong Cloud) via the `decK` CLI.
+## How this differs from my other Kong/gateway repos
 
-**Architecture**
-- **Gateway:**: Kong Gateway configured declaratively under `kong-gateway/`.
-- **Control plane:**: Konnect control plane where configuration is applied.
-- **Sync tool:**: `decK` (deck) is used to validate, diff and apply configuration from the repository to Konnect.
+This is the repo in the cluster that targets **Konnect** (Kong's SaaS control plane) rather than a self-run Kong node, and the CI pipeline is built around `deck gateway diff` for change previews before syncing — a workflow the other declarative-config repos (`kong-openapispec2proxy`, `kong-ai-gateway`) don't use. It also demonstrates a different plugin combination — `key-auth` plus `proxy-cache` — versus the AI-focused plugin pipeline in `kong-ai-gateway` or the MCP tool conversion in `kong-openapispec2mcp`. Where `Azure-Kong-AI-Gateway-IaC` provisions the infrastructure a data plane runs on, this repo is a small example of the service-level configuration Konnect would push down to that data plane.
 
-**Components (files in this folder)**
-- **Services:**: [todo-kong-gateway/kong-gateway/services.yaml](todo-kong-gateway/kong-gateway/services.yaml) — declares the `todo-service` pointing to `https://jsonplaceholder.typicode.com` and the route `/todos`.
-- **Consumers:**: [todo-kong-gateway/kong-gateway/consumers.yaml](todo-kong-gateway/kong-gateway/consumers.yaml) — contains the `upxill-dev` consumer and a key-auth credential.
-- **Authentication plugin:**: [todo-kong-gateway/kong-gateway/plugins-auth.yaml](todo-kong-gateway/kong-gateway/plugins-auth.yaml) — configures `key-auth` and key name(s).
-- **Caching plugin:**: [todo-kong-gateway/kong-gateway/plugins-cache.yaml](todo-kong-gateway/kong-gateway/plugins-cache.yaml) — configures `proxy-cache` with memory strategy and TTL.
-- **CI/CD workflow:**: [todo-kong-gateway/.github/workflows/deploy-gateway.yaml](todo-kong-gateway/.github/workflows/deploy-gateway.yaml) — GitHub Actions pipeline that validates, diffs, and applies the declarative configuration to Konnect using `decK`.
+## Tech Stack
 
-**CI/CD (GitHub Actions)**
-- **Trigger:**: `push` to `main` (deploy) and `pull_request` to `main` (dry-run validations).
-- **Key steps:**
-  - **Checkout code**: `actions/checkout@v4`.
-  - **Setup decK**: `kong/setup-deck@v1` (pinned `deck-version: '1.39.3'`).
-  - **Validate**: `deck gateway validate kong-gateway/` — syntax/lint validation.
-  - **Diff**: `deck gateway diff kong-gateway/` — preview configuration changes.
-  - **Apply**: `deck gateway apply kong-gateway/` — run only on pushes to `main` and uses `DECK_KONNECT_TOKEN` secret.
+- Kong Gateway, deployed to Kong Konnect (managed control plane)
+- decK CLI (`validate`, `diff`, `sync`)
+- `key-auth` and `proxy-cache` Kong plugins
+- GitHub Actions (`kong/setup-deck@v1`, pinned to decK 1.39.3)
 
-**How to run locally**
-- Install `decK` (match pinned version):
+## How it works
 
-  ```bash
-  # macOS (example via Homebrew)
-  brew install deck
-  deck version
-  ```
+1. **`services.yaml`** declares `todo-service`, pointing at `https://jsonplaceholder.typicode.com`, with a route (`todo-route`) exposing `/todos` (`strip_path: false` so sub-paths like `/todos/1` pass through).
+2. **`consumers.yaml`** declares one consumer, `upxill-dev`, with a `key-auth` credential.
+3. **`plugins-auth.yaml`** attaches `key-auth`, requiring an `apikey` header on every request.
+4. **`plugins-cache.yaml`** attaches `proxy-cache` (in-memory strategy, 600s TTL, only caching `200` JSON responses) so repeated `GET /todos` calls are served from cache instead of hitting the upstream every time.
+5. **CI/CD** (`.github/workflows/deploy-gateway.yaml`): on every push and PR to `main`, `deck gateway diff kong-gateway/` previews the change against the `quickstart` Konnect control plane; on a push to `main`, `deck gateway sync kong-gateway/` applies it, authenticated with a `DECK_KONNECT_TOKEN` repo secret.
 
-- Validate locally:
+## Getting Started
 
-  ```bash
-  deck gateway validate kong-gateway/
-  deck gateway diff kong-gateway/    # preview
-  deck gateway apply kong-gateway/   # applies (requires DECK_KONNECT_TOKEN)
-  ```
+Prerequisites: [decK](https://docs.konghq.com/deck/) CLI and a Kong Konnect account/control plane.
 
-**Secrets / Environment**
-- The workflow expects a secret named `DECK_KONNECT_TOKEN` in the repository settings to authenticate to Konnect.
-- Optionally set `DECK_KONNECT_CONTROL_PLANE_NAME` if you use a custom control plane name.
+```bash
+# Install decK (match the pinned CI version, 1.39.3)
+brew install deck
+deck version
 
-**Notes & Recommendations**
-- Keep `deck-version` pinned to match your local tooling to avoid unexpected behavior.
-- Use PRs to run the diff/validate steps before merging to `main`.
-- For production, consider adding automated tests or health checks that validate runtime behavior after sync.
+# Validate and preview locally
+deck gateway validate kong-gateway/
+deck gateway diff kong-gateway/
 
-**Files**
-- [todo-kong-gateway/.github/workflows/deploy-gateway.yaml](todo-kong-gateway/.github/workflows/deploy-gateway.yaml)
-- [todo-kong-gateway/kong-gateway/services.yaml](todo-kong-gateway/kong-gateway/services.yaml)
-- [todo-kong-gateway/kong-gateway/consumers.yaml](todo-kong-gateway/kong-gateway/consumers.yaml)
-- [todo-kong-gateway/kong-gateway/plugins-auth.yaml](todo-kong-gateway/kong-gateway/plugins-auth.yaml)
-- [todo-kong-gateway/kong-gateway/plugins-cache.yaml](todo-kong-gateway/kong-gateway/plugins-cache.yaml)
+# Apply to Konnect (requires DECK_KONNECT_TOKEN)
+export DECK_KONNECT_TOKEN=<your-konnect-token>
+deck gateway sync kong-gateway/
+```
 
-**Next steps**
-- Update consumer credentials and plugin tuning as needed for your environment.
-- Ask for help converting this to a self-hosted Gateway deployment or adding automated tests.
+For CI, set `DECK_KONNECT_TOKEN` as a repository secret; optionally set `DECK_KONNECT_CONTROL_PLANE_NAME` if you're not using the default `quickstart` control plane.
+
+## Project Structure
+
+```
+.
+├── README.md
+├── .github/workflows/deploy-gateway.yaml   # decK validate/diff/sync CI pipeline against Konnect
+└── kong-gateway/
+    ├── services.yaml       # todo-service + /todos route
+    ├── consumers.yaml      # upxill-dev consumer + key-auth credential
+    ├── plugins-auth.yaml   # key-auth plugin config
+    └── plugins-cache.yaml  # proxy-cache plugin config
+```
